@@ -1,4 +1,4 @@
-![image](https://github.com/Konovalova-Olesy/-Data-Analytic/assets/140737927/f140e967-9c78-454e-a896-d22ca2fa5280)# Портфолио: аналитик данных
+# Портфолио: аналитик данных
 
 ## Обо мне 
 
