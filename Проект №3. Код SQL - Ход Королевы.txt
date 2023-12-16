@@ -1,0 +1,15 @@
+select * 
+from netflix 
+where date_added between '2015-01-01 00:00' and '2020-12-31 23:59'
+-- «где» дата добавления фильма «между» 2015 г. «и» 2020 г. включительно
+    and rating in ('TV-G', 'TV-PG', 'TV-14', 'PG', 'PG-13' )
+-- «и» рейтинг «в» определенных значениях.
+    and (cast_names like '%Anya Taylor-Joy%'
+-- «И» строки из столбца cast_names,
+-- в которых есть значение Anya Taylor-Joy 
+        or description like '%Chess%'
+-- «или» строки из столбца description,
+-- в которых есть значение Chess,
+        or description like '%chess%')
+-- «или» строки из столбца description,
+-- в которых есть значение chess.
