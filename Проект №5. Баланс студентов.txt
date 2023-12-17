@@ -1,0 +1,95 @@
+Основная задача — смоделировать изменение балансов студентов.
+
+Подзадачи: выявить
+- сколько всего уроков было на балансе всех учеников за каждый календарный день;
+- как это количество менялось под влиянием транзакций (оплат, начислений, корректирующих списаний) и уроков (списаний с баланса по мере прохождения уроков).
+- И создать таблицу, где будут балансы каждого студента за каждый день.
+
+WITH first_payments as
+  (select user_id
+      , min(transaction_datetime::date) as first_payment_date
+  from skyeng_db.payments
+  where status_name = 'success'  
+  group by 1),
+    
+     all_dates as
+  (select    distinct class_start_datetime::date as dt
+    from skyeng_db.classes
+    where date_trunc('year', class_start_datetime) = '2016-01-01'
+  order by dt
+  ),
+  
+    all_dates_by_user as
+  (select user_id
+        , dt 
+  from first_payments 
+     join all_dates 
+     on dt >= first_payment_date
+  ),
+  
+    payments_by_dates as
+  (select user_id 
+        , date_trunc('day', transaction_datetime) as payment_date
+        , sum(classes) as transaction_balance_change
+  from skyeng_db.payments
+  where status_name = 'success'
+  group by 1, 2
+  order by 1, 2
+  ),
+  
+    payments_by_dates_cumsum as 
+  (select a_d_b_u.user_id
+        , dt
+        , transaction_balance_change
+        , sum(transaction_balance_change) over (partition by a_d_b_u.user_id order by dt) as transaction_balance_change_cs
+   from all_dates_by_user a_d_b_u
+      left join payments_by_dates p_d
+        on a_d_b_u.user_id = p_d.user_id
+        and payment_date = dt
+   ),
+   
+     classes_by_dates as
+   (select user_id
+         , date_trunc('day', class_start_datetime) as class_date
+         , count(id_class) * -1 as classes 
+    from skyeng_db.classes 
+    where class_status = 'success' or class_status = 'failed_by_student'
+    group by 1, 2
+    order by 1, 2
+    ),
+   
+      classes_by_dates_dates_cumsum as
+    (select a_d_b_u.user_id
+          , dt
+          , classes
+          , sum(classes) over (partition by a_d_b_u.user_id order by dt) as classes_cs 
+     from all_dates_by_user a_d_b_u
+       left join classes_by_dates c_b_d
+         on a_d_b_u.user_id = c_b_d.user_id
+         and class_date = dt
+     ),
+   
+      balances as
+     (
+     select p_d_c.user_id
+            , p_d_c.dt
+            , transaction_balance_change
+            , transaction_balance_change_cs
+            , classes
+            , classes_cs
+            , classes_cs + transaction_balance_change_cs as balance 
+      from payments_by_dates_cumsum p_d_c
+         join classes_by_dates_dates_cumsum c_d_d_c
+           on p_d_c.user_id = c_d_d_c.user_id
+           and p_d_c.dt = c_d_d_c.dt
+      )
+    
+    select dt 
+         , sum(transaction_balance_change) as transaction_balance_change
+         , sum(transaction_balance_change_cs) as transaction_balance_change_cs
+         , sum(classes) as classes
+         , sum(classes_cs) as classes_cs
+         , sum(balance) as balance
+    from balances
+    group by dt
+    order by dt
